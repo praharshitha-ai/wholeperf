@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Global safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Hardened Primitives ---
+    
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // --- Validation Blueprints ---
+
+    function isValidPatient(data) {
+      return data.keys().hasAll(['id', 'userId', 'name', 'procedure', 'createdAt'])
+        && data.id is string && data.id.size() <= 64
+        && data.userId == request.auth.uid
+        && data.name is string && data.name.size() <= 100
+        && data.procedure is string && data.procedure.size() <= 200
+        && data.status in ['Pre-Op', 'Intra-Op', 'Post-Op', 'Discharged']
+        && (data.get('bsa', 0) is number || data.get('bsa', 0) is int)
+        && data.createdAt == request.time;
+    }
+
+    function isValidInventory(data) {
+      return data.keys().hasAll(['id', 'name', 'stock'])
+        && data.id is string
+        && data.name is string && data.name.size() <= 200
+        && data.stock is int && data.stock >= 0;
+    }
+
+    // --- Collection Rules ---
+
+    match /patients/{recordId} {
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      allow create: if isSignedIn() && isValidId(recordId) && isValidPatient(request.resource.data);
+      
+      allow update: if isSignedIn() && isOwner(resource.data.userId) 
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.id == resource.data.id
+        && (
+          // Action: Metadata Update
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'procedure', 'notes', 'postOpNotes', 'status', 'updatedAt'])
+        )
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if false; // Regulatory requirement: Do not delete medical logs
+    }
+
+    match /inventory/{itemId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isValidId(itemId) && isValidInventory(request.resource.data);
+    }
+
+    match /records/{recordId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(recordId);
+    }
+
+    match /logs/{logId} {
+      allow read: if isSignedIn(); // Restricted in production to Admins
+      allow create: if isSignedIn() && isValidId(logId) && request.resource.data.userId == request.auth.uid;
+    }
+  }
+}

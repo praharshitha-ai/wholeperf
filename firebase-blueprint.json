@@ -1,0 +1,82 @@
+{
+  "entities": {
+    "PatientRecord": {
+      "title": "Patient Procedure Log",
+      "description": "Comprehensive perfusion records and intra-operative notes for a patient.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique record ID" },
+        "userId": { "type": "string", "description": "UID of the perfusionist/surgeon who created the record" },
+        "name": { "type": "string", "description": "Patient Name" },
+        "procedure": { "type": "string", "description": "Procedure Type" },
+        "date": { "type": "string", "format": "date", "description": "Date of surgery" },
+        "bsa": { "type": "number", "description": "Body Surface Area" },
+        "surgeon": { "type": "string", "description": "Primary Surgeon" },
+        "status": { "type": "string", "enum": ["Pre-Op", "Intra-Op", "Post-Op"], "description": "Current status of the case" },
+        "notes": { "type": "string", "description": "Intra-operative notes" },
+        "postOpNotes": { "type": "string", "description": "Post-operative recovery notes" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "name", "procedure", "createdAt"]
+    },
+    "InventoryItem": {
+      "title": "Inventory Item",
+      "description": "Surgical supplies and equipment stock levels.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "stock": { "type": "number" },
+        "threshold": { "type": "number" },
+        "status": { "type": "string" },
+        "lastSync": { "type": "string" }
+      },
+      "required": ["id", "name", "stock"]
+    },
+    "GrandRecord": {
+      "title": "Historical Surgical Record",
+      "description": "Condensed record for high-level vault and analytics.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "case": { "type": "string" },
+        "doc": { "type": "string" },
+        "date": { "type": "string" },
+        "safety": { "type": "string" }
+      },
+      "required": ["id", "case", "doc", "date"]
+    },
+    "AuditLog": {
+      "title": "System Audit Log",
+      "description": "Records of user actions and system events.",
+      "type": "object",
+      "properties": {
+        "user": { "type": "string" },
+        "userId": { "type": "string" },
+        "action": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/patients/{recordId}": {
+      "schema": "PatientRecord",
+      "description": "Patient procedure logs restricted by user authorship."
+    },
+    "/inventory/{itemId}": {
+      "schema": "InventoryItem",
+      "description": "Global inventory list for the facility."
+    },
+    "/records/{recordId}": {
+      "schema": "GrandRecord",
+      "description": "Centralized historical records."
+    },
+    "/logs/{logId}": {
+      "schema": "AuditLog",
+      "description": "System administration activity logs."
+    }
+  }
+}
